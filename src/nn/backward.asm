@@ -20,6 +20,7 @@ global backward_hidden
 ; ============================================================
 ; backward_output
 ; Computes output layer delta and gradients (1 output neuron)
+;   MSE gradient omits factor of 2 (absorbed into learning rate)
 ;   delta = (output - expected) * sigmoid_deriv(output)
 ;   grad_w_out[i] = delta * hidden_out[i]
 ;   grad_b_out = delta

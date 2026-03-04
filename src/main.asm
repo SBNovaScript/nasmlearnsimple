@@ -31,7 +31,8 @@ extern xor_targets
 ; ============================================================
 section .rodata
     align 8
-    learning_rate:  dq 0.5
+    learning_rate:  dq 2.0
+    half_f:         dq 0.5
     one_f:          dq 1.0
     two_f:          dq 2.0
     four_f:         dq 4.0
@@ -101,8 +102,10 @@ init_rng:
     ret
 
 ; ------------------------------------------------------------
-; next_random() -> xmm0: random double in [-1.0, 1.0)
+; next_random() -> xmm0: random double in [-0.5, 0.5)
 ; LCG with Knuth constants. Leaf function.
+; Range [-0.5, 0.5) approximates Xavier init for fan_in=2,
+; reducing sigmoid saturation and improving convergence.
 ; ------------------------------------------------------------
 next_random:
     mov     rax, [rel lcg_state]
@@ -120,9 +123,8 @@ next_random:
     cvtsi2sd xmm1, rax
     divsd   xmm0, xmm1             ; [0, 1)
 
-    ; Scale to [-1, 1)
-    addsd   xmm0, xmm0             ; [0, 2)
-    subsd   xmm0, [rel one_f]      ; [-1, 1)
+    ; Scale to [-0.5, 0.5)
+    subsd   xmm0, [rel half_f]     ; [-0.5, 0.5)
     ret
 
 ; ------------------------------------------------------------
