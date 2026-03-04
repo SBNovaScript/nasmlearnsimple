@@ -31,8 +31,8 @@ backward_output:
     push r12
     push r13
     ; 4 pushes total: RSP moved by 32 from entry. Entry RSP%16==8.
-    ; 8+32=40, 40%16==8. Need sub rsp,8 to align.
-    sub  rsp, 8
+    ; 8+32+24=64, 64%16==0. Aligned. Locals at [rbp-25]..[rbp-48].
+    sub  rsp, 24
 
     mov  r12, rdx              ; hidden_out
     mov  r13, rcx              ; grad_w_out
@@ -64,7 +64,7 @@ backward_output:
     mulsd xmm2, xmm1
     movsd [r13 + 8], xmm2     ; grad_w_out[1]
 
-    add  rsp, 8
+    add  rsp, 24
     pop  r13
     pop  r12
     pop  rbx
