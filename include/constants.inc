@@ -15,7 +15,7 @@
 %define OUTPUT_SIZE  1
 
 ; --- Training parameters ---
-%define MAX_EPOCHS   10000
-%define PRINT_EVERY  1000
+%define MAX_EPOCHS   50000
+%define PRINT_EVERY  10000
 
 %endif
