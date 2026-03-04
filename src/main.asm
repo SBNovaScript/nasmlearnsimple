@@ -32,6 +32,7 @@ extern xor_targets
 section .rodata
     align 8
     learning_rate:  dq 2.0
+    loss_threshold: dq 0.01
     half_f:         dq 0.5
     one_f:          dq 1.0
     two_f:          dq 2.0
@@ -391,9 +392,22 @@ _start:
     jmp     .epoch_loop
 
 ; ============================================================
-; Training complete — print final predictions
+; Check convergence — restart if stuck in local minimum
 ; ============================================================
 .training_done:
+    movsd   xmm0, [rel epoch_loss]
+    ucomisd xmm0, [rel loss_threshold]
+    jbe     .converged              ; loss <= 0.01, success
+
+    ; Stuck in local minimum — reinitialize and retry
+    call    init_weights
+    xor     r12d, r12d
+    jmp     .epoch_loop
+
+; ============================================================
+; Converged — print final predictions
+; ============================================================
+.converged:
     lea     rdi, [rel msg_results]
     mov     esi, msg_results_len
     call    print_string
