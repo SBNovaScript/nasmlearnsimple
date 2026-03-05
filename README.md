@@ -4,7 +4,7 @@ A neural network that learns XOR — written entirely in x86-64 NASM assembly. N
 
 ## What It Does
 
-Trains a 2-2-1 feedforward neural network to solve the XOR problem using backpropagation with online stochastic gradient descent. The entire pipeline — forward pass, loss computation, gradient calculation, weight updates, I/O, and timing — is implemented in ~1500 lines of hand-written assembly.
+Trains a 2-2-1 feedforward neural network to solve the XOR problem using backpropagation with online stochastic gradient descent. The entire pipeline — forward pass, loss computation, gradient calculation, weight updates, I/O, and timing — is implemented in ~1300 lines of hand-written assembly.
 
 ```
 $ ./build/nasmlearn
@@ -69,7 +69,7 @@ About 10% of random initializations land in a local minimum where the loss plate
 
 - **Target:** Linux x86-64 ELF64
 - **ABI:** System V AMD64 calling convention
-- **Floating point:** SSE2 scalar doubles (`movsd`, `addsd`, `mulsd`, `divsd`)
+- **Floating point:** SSE2 scalar doubles + SSE4.1 `roundsd`
 - **I/O:** Direct `sys_write` syscalls (no libc, no `printf`)
 - **Timing:** `clock_gettime(CLOCK_MONOTONIC)` via syscall 228
 - **Stack:** Non-executable (`GNU-stack` note in every object file)
@@ -104,7 +104,7 @@ nasmlearnsimple/
 
 ### Math (`src/math/`)
 
-**`exp.asm`** — Approximates e^x using the identity e^x = 2^n * e^r where n = round(x / ln2) and r = x - n*ln2. The fractional part e^r is evaluated with a degree-6 Taylor polynomial via Horner's method. Input is clamped to [-709, 709] to prevent IEEE 754 overflow/underflow. The 2^n factor is constructed by directly setting the exponent bits of a double.
+**`exp.asm`** — Approximates e^x using the identity e^x = 2^n * e^r where n = round(x / ln2) and r = x - n*ln2. Rounding uses SSE4.1 `roundsd`. The fractional part e^r is evaluated with a degree-6 Taylor polynomial via Horner's method. Input is clamped to [-709, 709] to prevent IEEE 754 overflow/underflow. The 2^n factor is constructed by directly setting the exponent bits of a double.
 
 **`sigmoid.asm`** — Computes sigmoid(x) = 1 / (1 + e^(-x)) by calling `exp_approx`. Also exports `sigmoid_deriv(s) = s * (1-s)` which takes the sigmoid *output* (not raw x) — a common optimization that avoids recomputing the exponential.
 
@@ -114,13 +114,13 @@ nasmlearnsimple/
 
 **`forward.asm`** — Generic dense layer forward pass. For each output neuron: computes dot product of input with weight row, adds bias, applies sigmoid. Works for any input/output dimensions.
 
-**`backward.asm`** — Backpropagation gradient computation. `backward_output` computes the output layer delta as (output - expected) * sigmoid'(output) and produces weight/bias gradients. `backward_hidden` propagates the output delta through the output weights, multiplies by sigmoid'(hidden), and produces hidden layer weight/bias gradients. The 7th argument (delta_hidden pointer) is passed on the stack per SysV AMD64 convention.
+**`backward.asm`** — Backpropagation gradient computation. `backward_output` computes the output layer delta as (output - expected) * sigmoid'(output) and produces weight/bias gradients. `backward_hidden` propagates the output delta through the output weights, multiplies by sigmoid'(hidden), and produces hidden layer weight/bias gradients. All pointer arguments fit in callee-saved registers, eliminating spill/reload overhead around `sigmoid_deriv` calls.
 
 **`update.asm`** — Applies SGD: `w[i] -= lr * grad[i]`. Leaf function, 6 instructions.
 
 ### I/O (`src/io/`)
 
-**`print.asm`** — Thin wrappers around `sys_write` (syscall 1) for strings, doubles, and newlines. No buffering.
+**`print.asm`** — Thin wrappers around `sys_write` (syscall 1) for strings, doubles, unsigned integers, and newlines. No buffering.
 
 **`string.asm`** — Converts a `double` to decimal ASCII with 4 fixed decimal places. Handles negative numbers, extracts integer/fractional parts separately, uses `roundsd` for correct rounding.
 
@@ -160,7 +160,7 @@ All functions follow the System V AMD64 ABI: arguments in `rdi`, `rsi`, `rdx`, `
 
 **No libc:** All I/O goes through raw Linux syscalls. This keeps the binary small, eliminates dynamic linking, and demonstrates low-level system programming.
 
-**Scalar SSE2:** Uses `movsd`/`addsd`/`mulsd`/`divsd` rather than x87 FPU or SIMD vectorization. SSE2 is baseline on all x86-64 CPUs and provides clean, predictable IEEE 754 double arithmetic.
+**SSE2 + SSE4.1:** Uses scalar double SSE2 instructions (`movsd`/`addsd`/`mulsd`/`divsd`) rather than x87 FPU or SIMD vectorization. SSE4.1 `roundsd` is used for IEEE 754-correct rounding in `exp_approx`. Both are baseline on any x86-64 CPU from 2008+.
 
 **Online SGD:** Weights are updated after every single training sample rather than batching. For a 4-sample dataset this makes no practical difference, but it simplifies the code by avoiding gradient accumulation buffers.
 

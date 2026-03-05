@@ -8,18 +8,17 @@ section .text
 global dot_product
 
 ; dot_product(rdi: *A, rsi: *B, rdx: count) -> xmm0: result
-; Computes sum of A[i] * B[i] for i = 0..count-1.
-; Leaf function — no calls, no frame pointer needed.
+; Leaf function.
 dot_product:
-    xorpd   xmm0, xmm0              ; xmm0 = accumulator = 0.0
-    xor     ecx, ecx                 ; rcx = index = 0
-    test    rdx, rdx                 ; check if count == 0
+    xorpd   xmm0, xmm0
+    xor     ecx, ecx
+    test    rdx, rdx
     jz      .done
 
 .loop:
-    movsd   xmm1, [rdi + rcx*8]     ; xmm1 = A[i]
-    mulsd   xmm1, [rsi + rcx*8]     ; xmm1 = A[i] * B[i]
-    addsd   xmm0, xmm1              ; accumulator += A[i] * B[i]
+    movsd   xmm1, [rdi + rcx*8]
+    mulsd   xmm1, [rsi + rcx*8]
+    addsd   xmm0, xmm1
     inc     rcx
     cmp     rcx, rdx
     jb      .loop

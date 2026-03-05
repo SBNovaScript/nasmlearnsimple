@@ -15,6 +15,7 @@ default rel
 extern print_string
 extern print_double
 extern print_newline
+extern print_uint64
 
 ; ============================================================
 ; Exports
@@ -93,13 +94,13 @@ timer_stop:
     lea     rsi, [rel ts_stop]
     syscall
 
-    ; elapsed = (stop.sec - start.sec) * 1e9 + (stop.nsec - start.nsec)
-    mov     rax, [rel ts_stop]          ; stop.tv_sec
-    sub     rax, [rel ts_start]         ; delta seconds
-    imul    rax, [rel ns_per_sec]       ; delta_sec * 1e9
-    mov     rcx, [rel ts_stop + 8]      ; stop.tv_nsec
-    sub     rcx, [rel ts_start + 8]     ; delta nanoseconds
-    add     rax, rcx                    ; total nanoseconds
+    ; elapsed_ns = (stop.sec - start.sec) * 1e9 + (stop.nsec - start.nsec)
+    mov     rax, [rel ts_stop]
+    sub     rax, [rel ts_start]
+    imul    rax, [rel ns_per_sec]
+    mov     rcx, [rel ts_stop + 8]
+    sub     rcx, [rel ts_start + 8]
+    add     rax, rcx
     mov     [rel elapsed_ns], rax
     ret
 
@@ -110,20 +111,13 @@ timer_stop:
 ; ------------------------------------------------------------
 timer_record_trial:
     mov     rax, [rel elapsed_ns]
-
-    ; sum += elapsed
     add     [rel stat_sum_ns], rax
-
-    ; count++
     inc     qword [rel stat_count]
 
-    ; min = min(min, elapsed)
     cmp     rax, [rel stat_min_ns]
     jae     .not_new_min
     mov     [rel stat_min_ns], rax
 .not_new_min:
-
-    ; max = max(max, elapsed)
     cmp     rax, [rel stat_max_ns]
     jbe     .not_new_max
     mov     [rel stat_max_ns], rax
@@ -147,18 +141,13 @@ timer_reset_stats:
 ; ------------------------------------------------------------
 ; timer_print_stats()
 ; Prints formatted timing results: Trials, Average, Min, Max.
-; Calls: print_string, print_double, print_newline, _print_uint64, _ns_to_ms
+; Calls: print_string, print_double, print_newline, print_uint64, _ns_to_ms
 ; ------------------------------------------------------------
 timer_print_stats:
     push    rbp
     mov     rbp, rsp
-    push    r12
-    ; 2 pushes: RSP moved 16 from entry. Entry RSP%16==8.
-    ; 8+16=24, 24%16==8. Need 8 more for alignment.
-    sub     rsp, 8
-    ; Now RSP%16==0. Aligned for calls.
+    ; Entry RSP%16==8, after push: RSP%16==0. Aligned.
 
-    ; --- Header ---
     lea     rdi, [rel msg_timing]
     mov     esi, msg_timing_len
     call    print_string
@@ -169,7 +158,7 @@ timer_print_stats:
     call    print_string
 
     mov     rdi, [rel stat_count]
-    call    _print_uint64
+    call    print_uint64
 
     call    print_newline
 
@@ -178,13 +167,13 @@ timer_print_stats:
     mov     esi, msg_avg_len
     call    print_string
 
-    ; avg = sum / count (as doubles, converted to ms)
+    ; avg_ms = sum_ms / count
     mov     rax, [rel stat_sum_ns]
-    call    _ns_to_ms               ; xmm0 = sum in ms
-    movsd   xmm1, xmm0             ; save sum_ms
+    call    _ns_to_ms
+    movsd   xmm1, xmm0
     mov     rax, [rel stat_count]
-    cvtsi2sd xmm0, rax             ; xmm0 = count as double
-    divsd   xmm1, xmm0             ; xmm1 = avg_ms
+    cvtsi2sd xmm0, rax
+    divsd   xmm1, xmm0
     movsd   xmm0, xmm1
     call    print_double
 
@@ -221,8 +210,6 @@ timer_print_stats:
     call    print_string
     call    print_newline
 
-    add     rsp, 8
-    pop     r12
     pop     rbp
     ret
 
@@ -235,53 +222,8 @@ timer_print_stats:
 ; Leaf function.
 ; ------------------------------------------------------------
 _ns_to_ms:
-    cvtsi2sd xmm0, rax             ; ns as double (signed, but ns fits in int64)
-    divsd   xmm0, [rel ns_to_ms_div] ; ns / 1e6 = ms
-    ret
-
-; ------------------------------------------------------------
-; _print_uint64(rdi: unsigned integer)
-; Converts to decimal ASCII, prints via print_string.
-; Calls: print_string
-; ------------------------------------------------------------
-_print_uint64:
-    push    rbp
-    mov     rbp, rsp
-    sub     rsp, 32                 ; local buffer
-    ; 1 push + 32 sub = 40 from entry. Entry RSP%16==8.
-    ; 8+40=48, 48%16==0. Aligned for calls.
-
-    mov     rax, rdi
-    lea     r8, [rbp - 1]           ; write pointer (end of buffer)
-    xor     ecx, ecx               ; digit count
-
-    test    rax, rax
-    jnz     .pu_nonzero
-    mov     byte [r8], '0'
-    dec     r8
-    inc     ecx
-    jmp     .pu_print
-
-.pu_nonzero:
-.pu_loop:
-    test    rax, rax
-    jz      .pu_print
-    xor     edx, edx
-    mov     r9, 10
-    div     r9
-    add     dl, '0'
-    mov     [r8], dl
-    dec     r8
-    inc     ecx
-    jmp     .pu_loop
-
-.pu_print:
-    lea     rdi, [r8 + 1]           ; start of digit string
-    mov     esi, ecx               ; length
-    call    print_string
-
-    add     rsp, 32
-    pop     rbp
+    cvtsi2sd xmm0, rax
+    divsd   xmm0, [rel ns_to_ms_div]
     ret
 
 section .note.GNU-stack noalloc noexec nowrite progbits

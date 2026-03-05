@@ -20,6 +20,7 @@ default rel
 extern print_double
 extern print_string
 extern print_newline
+extern print_uint64
 extern forward_layer
 extern backward_output
 extern backward_hidden
@@ -40,8 +41,6 @@ section .rodata
     learning_rate:  dq 2.0
     loss_threshold: dq 0.01
     half_f:         dq 0.5
-    one_f:          dq 1.0
-    two_f:          dq 2.0
     four_f:         dq 4.0
 
     msg_title:      db "=== NASM Learn Simple ===", 10
@@ -84,7 +83,6 @@ section .bss
     grad_b_out:     resq 1
     grad_w_hid:     resq 4
     grad_b_hid:     resq 2
-    delta_hidden:   resq 2
 
     ; PRNG state
     lcg_state:      resq 1
@@ -143,8 +141,7 @@ init_weights:
     mov     rbp, rsp
     push    r12
     push    r13
-    ; 3 pushes: RSP moved 24 from entry. Entry RSP%16==8.
-    ; 8+24=32, 32%16==0. Aligned for calls.
+    ; 3 pushes = 24. Entry RSP%16==8. 8+24=32, 32%16==0. Aligned.
 
     call    init_rng
 
@@ -184,51 +181,6 @@ init_weights:
 
     pop     r13
     pop     r12
-    pop     rbp
-    ret
-
-; ------------------------------------------------------------
-; print_int(rdi: unsigned integer)
-; Converts to decimal ASCII, prints via print_string.
-; Calls: print_string
-; ------------------------------------------------------------
-print_int:
-    push    rbp
-    mov     rbp, rsp
-    sub     rsp, 32                 ; local buffer (32 bytes)
-    ; 1 push + 32 sub = 40 from entry. Entry RSP%16==8.
-    ; 8+40=48, 48%16==0. Aligned for calls.
-
-    mov     rax, rdi
-    lea     r8, [rbp - 1]           ; write pointer (end of buffer)
-    xor     ecx, ecx                ; digit count
-
-    test    rax, rax
-    jnz     .pi_nonzero
-    mov     byte [r8], '0'
-    dec     r8
-    inc     ecx
-    jmp     .pi_print
-
-.pi_nonzero:
-.pi_loop:
-    test    rax, rax
-    jz      .pi_print
-    xor     edx, edx
-    mov     r9, 10
-    div     r9
-    add     dl, '0'
-    mov     [r8], dl
-    dec     r8
-    inc     ecx
-    jmp     .pi_loop
-
-.pi_print:
-    lea     rdi, [r8 + 1]           ; start of digit string
-    mov     esi, ecx                ; length
-    call    print_string
-
-    add     rsp, 32
     pop     rbp
     ret
 
@@ -326,20 +278,14 @@ _start:
     call    backward_output
 
     ; --- Backward pass: hidden layer ---
-    ; backward_hidden(hidden_out, input, delta_out, w_output,
-    ;                 grad_w_hid, grad_b_hid, delta_hidden)
-    ; 7th arg (delta_hidden) goes on stack
+    ; backward_hidden(hidden_out, input, delta_out, w_output, grad_w_hid, grad_b_hid)
     lea     rdi, [rel hidden_out]
-    mov     rsi, r14                ; input pointer (callee-saved)
-    lea     rdx, [rel grad_b_out]   ; delta_out value stored here
+    mov     rsi, r14
+    lea     rdx, [rel grad_b_out]
     lea     rcx, [rel w_output]
     lea     r8, [rel grad_w_hid]
     lea     r9, [rel grad_b_hid]
-    lea     rax, [rel delta_hidden]
-    sub     rsp, 8                  ; alignment padding
-    push    rax                     ; 7th arg at [rsp], RSP%16==0
     call    backward_hidden
-    add     rsp, 16                 ; clean up 7th arg + padding
 
     ; --- Update weights: output layer ---
     lea     rdi, [rel w_output]
@@ -396,7 +342,7 @@ _start:
     call    print_string
 
     mov     rdi, r12
-    call    print_int
+    call    print_uint64
 
     lea     rdi, [rel msg_loss]
     mov     esi, msg_loss_len

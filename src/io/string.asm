@@ -7,7 +7,6 @@ default rel
 section .data
     align 8
     const_10000: dq 10000.0
-    const_10:    dq 10.0
     const_0:     dq 0.0
 
 section .text
