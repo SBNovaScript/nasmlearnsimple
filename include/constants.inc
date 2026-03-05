@@ -18,4 +18,9 @@
 %define MAX_EPOCHS   10000
 %define PRINT_EVERY  1000
 
+; --- Timing ---
+%define SYS_clock_gettime  228
+%define CLOCK_MONOTONIC    1
+%define NUM_TRIALS         10
+
 %endif

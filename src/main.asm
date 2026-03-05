@@ -6,6 +6,7 @@
 ;   r12 = epoch counter    (callee-saved, survives all calls)
 ;   r13 = sample index     (callee-saved, survives all calls)
 ;   r14 = current input ptr (callee-saved, survives all calls)
+;   r15 = trial counter    (callee-saved, survives all calls)
 ;
 ; Stack alignment: _start enters with RSP%16==0 (ELF ABI).
 ; All function calls maintain RSP%16==0 before `call`.
@@ -25,6 +26,11 @@ extern backward_hidden
 extern update_weights
 extern xor_inputs
 extern xor_targets
+extern timer_start
+extern timer_stop
+extern timer_record_trial
+extern timer_reset_stats
+extern timer_print_stats
 
 ; ============================================================
 ; Read-only data
@@ -241,6 +247,16 @@ _start:
     mov     esi, msg_train_len
     call    print_string
 
+    ; --- Trial loop setup ---
+    call    timer_reset_stats
+    xor     r15d, r15d              ; r15 = trial counter
+
+.trial_loop:
+    cmp     r15, NUM_TRIALS
+    jge     .all_trials_done
+
+    call    timer_start
+
     ; --- Initialize weights ---
     call    init_weights
 
@@ -362,6 +378,10 @@ _start:
     divsd   xmm0, [rel four_f]
     movsd   [rel epoch_loss], xmm0
 
+    ; Suppress epoch output for non-final trials
+    cmp     r15, NUM_TRIALS - 1
+    jne     .skip_print
+
     ; Print every PRINT_EVERY epochs
     mov     rax, r12
     xor     edx, edx
@@ -405,9 +425,18 @@ _start:
     jmp     .epoch_loop
 
 ; ============================================================
-; Converged — print final predictions
+; Converged — record trial timing, loop to next trial
 ; ============================================================
 .converged:
+    call    timer_stop
+    call    timer_record_trial
+    inc     r15
+    jmp     .trial_loop
+
+; ============================================================
+; All trials done — print final predictions (from last trial)
+; ============================================================
+.all_trials_done:
     lea     rdi, [rel msg_results]
     mov     esi, msg_results_len
     call    print_string
@@ -416,7 +445,7 @@ _start:
 
 .result_loop:
     cmp     r13, 4
-    jge     .exit
+    jge     .print_timing
 
     ; Compute input pointer
     mov     rax, r13
@@ -481,6 +510,9 @@ _start:
 
     inc     r13
     jmp     .result_loop
+
+.print_timing:
+    call    timer_print_stats
 
 .exit:
     mov     eax, SYS_exit
