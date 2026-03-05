@@ -1,3 +1,8 @@
+; SPDX-License-Identifier: Apache-2.0
+; Copyright (c) 2026-present Steven Baumann
+; Original repository: https://github.com/SBNovaScript/nasmlearnsimple
+; See LICENSE and NOTICE in the repository root for details.
+;
 ; src/math/exp.asm
 ; e^x approximation using range reduction + Horner's polynomial
 

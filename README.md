@@ -1,10 +1,10 @@
 # NASM Learn Simple
 
-A neural network that learns XOR — written entirely in x86-64 NASM assembly. No C, no libc, no external libraries. Just raw syscalls, registers, and floating-point math.
+A neural network that learns XOR written entirely in x86-64 NASM assembly.
 
 ## What It Does
 
-Trains a 2-2-1 feedforward neural network to solve the XOR problem using backpropagation with online stochastic gradient descent. The entire pipeline — forward pass, loss computation, gradient calculation, weight updates, I/O, and timing — is implemented in ~1300 lines of hand-written assembly.
+Trains a 2-2-1 feedforward neural network to solve the XOR problem using backpropagation with online stochastic gradient descent. The entire pipeline: forward pass, loss computation, gradient calculation, weight updates, I/O, and timing, is implemented in ~1300 lines of hand-written assembly.
 
 ```
 $ ./build/nasmlearn

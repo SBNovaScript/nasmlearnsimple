@@ -1,3 +1,8 @@
+; SPDX-License-Identifier: Apache-2.0
+; Copyright (c) 2026-present Steven Baumann
+; Original repository: https://github.com/SBNovaScript/nasmlearnsimple
+; See LICENSE and NOTICE in the repository root for details.
+;
 ; src/nn/forward.asm
 ; forward_layer(rdi: *input, rsi: *weights, rdx: *biases,
 ;               rcx: *output, r8: in_count, r9: out_count)

@@ -1,3 +1,8 @@
+; SPDX-License-Identifier: Apache-2.0
+; Copyright (c) 2026-present Steven Baumann
+; Original repository: https://github.com/SBNovaScript/nasmlearnsimple
+; See LICENSE and NOTICE in the repository root for details.
+;
 ; src/nn/update.asm
 ; update_weights(rdi: *weights, rsi: *gradients, rdx: count, xmm0: learning_rate)
 ;   w[i] -= lr * grad[i]
